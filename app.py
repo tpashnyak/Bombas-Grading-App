@@ -11,6 +11,7 @@ import streamlit as st
 from rubric_data import ITEMS, MAX_TOTAL, SCORE_GUIDANCE
 from rubric_pdf import render_pdf
 from grader import extract_submission, assess_with_ai
+from rule_grader import segment_student_answers, assess_with_rules
 
 st.set_page_config(page_title='Bombas | Teacher Grading Studio', page_icon='🧦',layout='wide')
 st.markdown('''<style>
@@ -29,13 +30,13 @@ with st.sidebar:
     st.header('Rubric & settings')
     st.download_button('Download blank fillable PDF',data=(BASE/'Bombas_Fillable_Rubric.pdf').read_bytes(),
                        file_name='Bombas_Fillable_Rubric.pdf',mime='application/pdf',use_container_width=True)
-    st.markdown('**AI assistance (optional)**')
-    st.caption('No key? All seven questions can be graded manually, and the printable PDF still works.')
-    api_key=st.text_input('OpenAI API key',type='password',help='Optional. An AI grading request sends extracted student text to OpenAI. Enter only if authorized by your institution.')
-    model=st.text_input('Model',value='gpt-4.1-mini',help='Use a model enabled for your API project.')
+    st.success('No API key needed for rule-based suggestions or manual grading.')
     tone=st.selectbox('Feedback voice',['Supportive and specific','Concise and professional','Warm coaching with a revision question'])
-    st.info('Privacy: Do not upload identifiable student work to AI unless your school authorizes the processing. Files are parsed in memory. The app itself does not save submissions to disk; hosting settings and external API use still matter.')
-    st.warning('AI suggestions are drafts, not final grades. Scanned PDFs, handwritten pages, and image-only Word content require OCR/manual review.')
+    with st.expander('Optional OpenAI grading (requires API key)'):
+        api_key=st.text_input('OpenAI API key',type='password',help='Optional. AI grading sends extracted student text to OpenAI. Enter only if authorized by your institution.')
+        model=st.text_input('Model',value='gpt-4.1-mini',help='Use a model enabled for your API project.')
+    st.info('No-API assistance analyzes text inside this running app without sending it to an AI service. Uploaded work is processed in server memory, so check institutional approval and hosting privacy requirements. OpenAI assistance, if selected, transmits extracted student text.')
+    st.warning('Every suggestion is a draft, not a final grade. Scanned PDFs, handwriting, and image-only Word content require OCR or manual review.')
 
 st.subheader('1. Add student work')
 files=st.file_uploader('Upload one or more student submissions (.docx or .pdf)',
@@ -74,28 +75,65 @@ with meta_cols[1]: teacher=st.text_input('Teacher name',key=prefix+'teacher')
 with meta_cols[2]: assessment_date=st.date_input('Date',value=date.today(),key=prefix+'date')
 
 st.subheader('2. Draft scores and feedback')
+
+def load_draft(draft, method):
+    for item in draft['grades']:
+        st.session_state[prefix+'score_'+item['id']]=str(item['score'])
+        st.session_state[prefix+'note_'+item['id']]=item['note'][:115]
+        st.session_state[prefix+'evidence_'+item['id']]=item['student_evidence']
+    st.session_state[prefix+'response']=draft['teacher_response'][:480]
+    st.session_state[prefix+'next']=draft['revision_prompt'][:215]
+    st.session_state[prefix+'flags']=draft['review_flags']
+    st.session_state[prefix+'method']=method
+    st.session_state[prefix+'approved']=False
+
 if ident!='manual':
-    if st.button('✨ Draft all seven scores + teacher response with AI',type='primary',disabled=not(bool(api_key.strip()) and len(student_text.strip())>=40)):
+    parsed, detection_flags = segment_student_answers(student_text)
+    # The first upload populates boxes. Teachers may correct PDF/Word extraction
+    # and ambiguous numbering before using rule-based suggestions.
+    if prefix+'answer_init' not in st.session_state:
+        for item in ITEMS:
+            st.session_state[prefix+'answer_'+item['id']]=parsed[item['id']]
+        st.session_state[prefix+'answer_init']=True
+    with st.expander('Review or correct the seven detected answers before grading', expanded=True):
+        st.caption('This is especially important for Word/PDF submissions with unusual numbering. '
+                   'Edit any incomplete or wrongly matched response; only these answer boxes are used by the no-API grader.')
+        for item in ITEMS:
+            st.text_area(f"{item['id']} · {item['label']}",key=prefix+'answer_'+item['id'],height=84)
+        if detection_flags:
+            for warning in detection_flags: st.warning(warning)
+    local_answers={i['id']:st.session_state[prefix+'answer_'+i['id']] for i in ITEMS}
+    b1,b2=st.columns(2)
+    with b1:
+        local_button=st.button('🔎 Suggest grades + feedback (NO API)', type='primary',
+                               disabled=not any(v.strip() for v in local_answers.values()),
+                               use_container_width=True)
+    with b2:
+        ai_button=st.button('✨ AI-assisted grading (API key)',
+                            disabled=not(bool(api_key.strip()) and len(student_text.strip())>=40),
+                            use_container_width=True)
+    if local_button:
+        draft=assess_with_rules(local_answers,tone)
+        load_draft(draft,'Rules: no API')
+        st.success('Preliminary rule-based suggestions entered. Review each score and comment; the app does not understand nuanced arguments.')
+    if ai_button:
         try:
-            with st.spinner('Reading answers against the teaching-note criteria…'):
+            with st.spinner('Drafting suggestions against the teaching-note criteria…'):
                 draft=assess_with_ai(student_text,api_key,model,tone)
-            for item in draft['grades']:
-                st.session_state[prefix+'score_'+item['id']]=str(item['score'])
-                st.session_state[prefix+'note_'+item['id']]=item['note']
-                st.session_state[prefix+'evidence_'+item['id']]=item['student_evidence']
-            st.session_state[prefix+'response']=draft['teacher_response']
-            st.session_state[prefix+'next']=draft['revision_prompt']
-            st.session_state[prefix+'flags']=draft['review_flags']
-            st.session_state[prefix+'approved']=False
-            st.success('AI draft ready. Verify each response, edit scores, and approve the final PDF.')
+            load_draft(draft,'AI draft')
+            st.success('AI draft entered. Verify each response, edit scores, and approve the final PDF.')
         except Exception as exc:
             st.error('AI assessment failed: '+str(exc))
     if not api_key.strip():
-        st.caption('Enter an authorized API key in the sidebar to enable AI drafts, or complete the fields below manually.')
+        st.caption('No API key required: use the left button. AI grading on the right is optional.')
+    st.warning('Rule-based grading is a rough draft based on terms and patterns, not reliable semantic evaluation. '
+               'It may miss valid paraphrases or over-credit keywords. Review every grade; evaluate the creative application yourself.')
 
 flags=st.session_state.get(prefix+'flags','')
 if flags:
     st.warning('Teacher review flags: '+flags)
+if st.session_state.get(prefix+'method'):
+    st.caption('Current draft source: '+st.session_state[prefix+'method'])
 
 st.caption(SCORE_GUIDANCE)
 scores={}; notes={}; problems=[]
@@ -121,7 +159,7 @@ for item in ITEMS:
         notes[item_id]=st.text_input('Criterion feedback (appears in the rubric row)',key=prefix+'note_'+item_id,
                                       max_chars=115,placeholder='Specific success or point to improve')
         evidence=st.session_state.get(prefix+'evidence_'+item_id,'')
-        if evidence: st.caption('AI-cited student excerpt (verify against original): '+evidence)
+        if evidence: st.caption('Extracted student excerpt (verify against original): '+evidence)
 
 st.subheader('3. Compose teacher response')
 response=st.text_area('Personalized teacher response (strength + evidence + next move)',

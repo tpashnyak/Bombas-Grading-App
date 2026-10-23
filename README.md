@@ -1,67 +1,68 @@
-# Bombas Grading Studio — teacher guide
+# Bombas Grading Studio — NO-API edition
 
-This is a **working local Streamlit application** for scoring the seven questions in the uploaded Bombas case materials. The **blank one-page PDF** is fillable in a standard PDF editor such as Adobe Acrobat Reader and can also be printed for handwriting. The app makes a **separate, print-ready completed PDF** after teacher review. It is not hosted online; run or deploy the app yourself.
+This Streamlit web app grades the **seven Bombas Topic 1.1 case-study questions** in three modes: manual scoring, **rule-based draft grading without an API key**, and optional OpenAI-assisted draft grading. Teachers make the final decision for every score and comment. The scoring criteria come from the user-supplied Bombas handout and teaching note. The rubric is teacher-developed, not an official College Board rubric.
 
-## What you receive
+## A. Update an existing GitHub / Streamlit app — easiest
 
-- `Bombas_Fillable_Rubric.pdf`: editable one-page 100-point rubric, with student/teacher/date fields, seven score/quick-comment boxes, total score, teacher response, and a revision prompt.
-- `app.py`: Streamlit user interface for upload, AI draft grading, manual overrides, feedback editing, and print-ready PDF export.
-- `grader.py`: `.pdf`/`.docx` text extraction and optional AI assessment against the supplied teaching-note evidence.
-- `rubric_data.py`, `rubric_pdf.py`: scoring framework and PDF rendering.
+If Bombas Grading Studio is **already on GitHub** and Streamlit is **already deployed**:
 
-## Windows setup
+1. Download `Bombas_NoAPI_GitHub_Update.zip` and **extract** it on your computer.
+2. Open your repository: `https://github.com/tpashnyak/Bombas-Grading-App` (or your actual repository).
+3. Verify you are on branch `main`, and that `app.py`, `grader.py`, `rubric_data.py`, and `rubric_pdf.py` appear in the repository's top-level file list.
+4. Click **Add file → Upload files**. Upload the **three files inside the extracted update package**, namely `app.py`, `rule_grader.py`, and `README.md`. GitHub can update existing files that have the same name.
+5. Enter a commit message such as `Add free rule-based grading without API`, then **Commit changes** to the appropriate branch (or use a pull request if your repository requires it).
+6. Return to your existing Streamlit app and refresh. Streamlit Community Cloud normally updates the app automatically when you commit changes to the connected GitHub branch. You should now see **Suggest grades + feedback (NO API)**.
+7. If it does not update, verify your Streamlit app is using repository `tpashnyak/Bombas-Grading-App`, branch `main`, and main file `app.py` in the repository root; look at **Manage app → Logs** for errors.
 
-1. Install **Python 3.10 or newer** from https://www.python.org/downloads/ if needed. During installation, enable *Add Python to PATH*.
-2. Unzip this project into a folder (do not run directly from the ZIP).
-3. Double-click `START_HERE_Windows.bat`. It creates a local virtual environment, installs the packages, and starts the local app in your browser. This initial setup needs an Internet connection.
-4. For future launches, run the batch file again. It may check the packages before starting.
+**Do not upload the ZIP itself as the app.** GitHub must contain individual Python files. Do not put the files inside an extra subfolder if Streamlit expects `app.py` at the repository root.
 
-## macOS or Linux setup
+## B. First-time Streamlit deployment
 
-Run in the unzipped project folder:
+1. Download `Bombas_Grading_Studio_NoAPI_Complete.zip`, then extract its contents.
+2. Create a GitHub repository and upload all files **inside** `Bombas_Grading_App/` to the repository root.
+3. Visit https://share.streamlit.io and sign in with GitHub. Select **Create app** and your repository.
+4. Enter **Branch: `main`** (or the branch your repository actually uses) and **Main file path: `app.py`**.
+5. Deploy the app. No OpenAI API key or payment account is needed for the offline rule-based grading engine.
 
-```bash
-python3 -m venv .venv
-source .venv/bin/activate
-python -m pip install -r requirements.txt
-python -m streamlit run app.py
-```
+## C. Teacher workflow
 
-The app normally opens at `http://localhost:8501`. Stop it with Ctrl+C in the terminal.
+1. Upload a `.docx` Word document or **searchable** `.pdf` student assignment. Scanned PDFs need OCR before use.
+2. Select the uploaded student's file and verify the seven automatically detected answers. You can correct or paste answers in the seven text boxes if the file formatting confused the parser.
+3. Click **🔎 Suggest grades + feedback (NO API)**. This analyzes extracted text within the running Streamlit app; it makes **no OpenAI API request**.
+4. Review the suggested 100-point scores, each criterion's comment, the teacher response, and the next-step question. Correct misleading scores and write your own feedback where needed, especially for creative or nuanced student work.
+5. Check the teacher-review approval box, then click **Download one-page completed rubric (PDF)** to print.
+6. Alternatively, use the completely **Manual grading** option without an upload. The sidebar also offers the blank, fillable PDF.
 
-## Teacher workflow
+## Grading criteria / points
 
-1. Upload one or more student's Word (`.docx`) or searchable PDF (`.pdf`) files. Choose the submission to grade, or choose the **Manual grading** option.
-2. Inspect extracted text to ensure all responses were captured. Image-based scans require OCR first; Word images and handwriting are not parsed.
-3. Without an API key, type scores and feedback yourself. **Optional AI:** enter your personal/institution-authorized **OpenAI API key** in the sidebar and click **Draft all seven scores + teacher response with AI**. API usage may incur separate charges.
-4. Review evidence, scores, and comments against the actual student submission. Correct any mistakes. AI drafts should not be automatically treated as final grades.
-5. Edit the personal teacher response and next-step prompt. Confirm teacher review, then download a **one-page print-ready PDF**.
-6. Repeat for other uploaded files; the app tracks entries per file during the current browser session.
-
-## Scoring design (100 points)
-
-| ID | Criterion | Points |
+| Question | Rubric criterion | Points |
 | --- | --- | ---: |
 | R1 | Business and products | 10 |
 | R2 | People and stakeholders | 15 |
 | R3 | Opportunity or challenge | 10 |
 | P1 | Target paying customer | 15 |
 | P2 | Market gap | 15 |
-| P3 | Research and problem-solution fit | 20 |
+| P3 | Market/technical research and problem-solution fit | 20 |
 | A1 | Product improvement proposal | 15 |
+| **Total** | | **100** |
 
-This *teacher-created allocation* is based on the uploaded Bombas reading questions, practice questions, application activity, and teaching note. It is **not** an official College Board rubric.
+## Limitations and privacy
 
-## Privacy, safety, and deployment
+**Rule-based grading is not AI.** The no-API system uses question headings and transparent concept/keyword patterns to generate **preliminary suggestions**. It can miss synonyms, reward irrelevant keyword use, misinterpret negation, and cannot reliably assess critical thinking, originality, or the strength of an explanation. In particular, the application question receives a conservative *provisional* score; the teacher must evaluate it personally. The teacher can change every score, comment, and feedback field before issuing a final grade. Student work is not saved to files by the application code, but uploading to a publicly reachable Streamlit instance still transfers the work to that hosting service. Use only test or institution-approved data until privacy and access-control requirements are addressed.
 
-Student work is processed in memory by the app and not written to files by the included code. Streamlit or infrastructure operators may have their own operational/logging practices. When you explicitly click the AI draft button, the app sends the **extracted student text** and the teacher-developed rubric/teaching reference to an OpenAI API model for analysis. The request uses `store=False`. Do not use with student data unless the processing is approved by your institution and complies with its privacy requirements. For greater privacy, choose the fully manual path, which makes no AI request.
+Optional AI assistance requires your own OpenAI API key and may incur separate charges. Do not commit credentials to GitHub or use identifiable student work with third-party AI services without institution approval.
 
-**Do not place an API key in source files or publish it in GitHub.** The sidebar password field is session-specific; if deployed, use a server-side secret manager. Safeguard the local machine and access to the app.
+The app reads only selectable text in `.docx` and `.pdf` (no handwriting recognition, OCR, LMS connections, gradebook sync, or batch export). Grading is per student file in the current browser session. Print-ready completed PDFs are separate from the blank AcroForm template.
 
-The AI response is a **draft**. It may overlook sections, misread tables, make grading mistakes, or be biased. Original work and professional teacher judgment take priority. Incomplete/non-extractable documents should be reviewed manually. The PDF exporter truncates overlong row notes or teacher comments to fit the single page; the app limits character counts to reduce clipping. Check the PDF before printing.
+## Files
 
-## Customize
+- `app.py` — Streamlit interface; upload, preview, draft buttons, teacher review, export.
+- `rule_grader.py` — local rule-based grading engine and answer splitter; no API access.
+- `grader.py` — extraction of DOCX/PDF plus **optional** OpenAI grading.
+- `rubric_data.py` — teacher-developed rubric and answer-key elements.
+- `rubric_pdf.py` — one-page printable PDF generator.
+- `Bombas_Fillable_Rubric.pdf` — editable one-page blank PDF.
+- `requirements.txt` — Python dependencies for Streamlit deployment.
+- `START_HERE_Windows.bat` — run the full app locally on Windows, if desired.
 
-- Adjust question weights/criteria and source-aligned teaching notes in `rubric_data.py` (weights should still total 100 unless you revise the form). Recreate the blank template by running `python rubric_pdf.py`.
-- Change AI model in the sidebar if your API account has access to another supported model.
-- For team-wide use, deploy `app.py` to an institution-approved Streamlit-compatible server. This package is **not** a hosted service and does not include student accounts or an LMS gradebook integration.
+For local use, extract the full ZIP and double-click `START_HERE_Windows.bat`. Python 3.10+ is required for local use; Streamlit hosting installs it for you.
